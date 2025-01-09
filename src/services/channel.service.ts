@@ -174,16 +174,14 @@ export class ChannelService {
     if (!channel) throw new Error('Channel not found');
 
     if (channel.type === 'public') {
-      console.log('Channel is public');
       // For public channels, get all users and format them as channel members
       const { data: profiles, error: profilesError } = await client
-        .from('profiles')
+        .from('public_profiles')
         .select('*');
 
       if (profilesError) throw profilesError;
       if (!profiles) return [];
 
-      console.log('Getting all users');
       // Convert profiles to channel members format with proper typing
       return profiles.map(profile => ({
         id: `${channelId}_${profile.id}`,
