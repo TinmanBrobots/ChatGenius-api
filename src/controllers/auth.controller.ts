@@ -36,10 +36,11 @@ export class AuthController {
   }
 
   updatePassword = async (req: Request, res: Response) => {
+    const userId = req.user.id;
     const { password } = req.body;
 
     try {
-      await authService.updatePassword(password);
+      await authService.updatePassword(userId, password);
       res.json({ message: 'Password updated successfully' });
     } catch (error: any) {
       res.status(400).json({ error: error.message });

@@ -1,20 +1,16 @@
 {
+  "name": "chatgenius-backend",
+  "version": "1.0.0",
+  "description": "Backend for ChatGenius",
+  "main": "src/index.ts",
   "scripts": {
-    "start": "node dist/server.js",
+    "start": "ts-node src/server.ts",
     "dev": "nodemon src/server.ts",
     "build": "tsc",
-    "test": "jest",
-    "apply-rls": "ts-node scripts/apply-rls-policies.ts",
-    "create-test-channels": "ts-node scripts/create-test-channels.ts",
-    "create-test-messages": "ts-node scripts/create-test-messages.ts"
+    "test": "jest --config=jest.config.js",
+    "test:watch": "jest --config=jest.config.js --watch",
+    "init-db": "ts-node scripts/init-database.ts"
   },
-  "name": "backend",
-  "version": "1.0.0",
-  "main": "index.js",
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "@supabase/supabase-js": "^2.47.10",
     "cors": "^2.8.5",
@@ -22,13 +18,25 @@
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
+    "jest": "^29.7.0",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.5",
     "nodemon": "^3.1.9",
+    "@types/cors": "^2.8.17",
+    "@types/jest": "^29.5.11",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/tests/setup.ts"
+    ]
   }
 }

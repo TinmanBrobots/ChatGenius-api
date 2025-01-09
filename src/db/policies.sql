@@ -74,13 +74,12 @@ USING (
   )
 );
 
-CREATE POLICY "Admin users can create channels"
+CREATE POLICY "Users can create channels"
 ON channels FOR INSERT
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM profiles
     WHERE profiles.id = auth.uid()
-    AND profiles.role = 'admin'
   )
 );
 
