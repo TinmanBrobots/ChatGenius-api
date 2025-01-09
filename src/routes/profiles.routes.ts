@@ -1,53 +1,54 @@
 import { Router } from 'express';
-import { profileController } from '../controllers/profile.controller';
+import { ProfileController } from '../controllers/profile.controller';
 import { authenticateUser } from '../middleware/auth';
 import { isAdmin, isProfileOwner } from '../middleware/authorization';
 
 const router = Router();
+const controller = new ProfileController();
 
 // Public routes
-router.get('/search', authenticateUser, profileController.searchProfiles);
-router.get('/username/:username', authenticateUser, profileController.getProfileByUsername);
+router.get('/search', authenticateUser, controller.searchProfiles);
+router.get('/username/:username', authenticateUser, controller.getProfileByUsername);
 
 // Protected routes (require authentication)
-router.get('/:id', authenticateUser, profileController.getProfile);
+router.get('/:id', authenticateUser, controller.getProfile);
 
 // Owner-only routes (require authentication and ownership)
 router.patch('/:id', 
   authenticateUser, 
   isProfileOwner, 
-  profileController.updateProfile
+  controller.updateProfile
 );
 
 router.put('/:id/status',
   authenticateUser,
   isProfileOwner,
-  profileController.updateStatus
+  controller.updateStatus
 );
 
 router.put('/:id/notifications',
   authenticateUser,
   isProfileOwner,
-  profileController.updateNotificationPreferences
+  controller.updateNotificationPreferences
 );
 
 router.put('/:id/theme',
   authenticateUser,
   isProfileOwner,
-  profileController.updateTheme
+  controller.updateTheme
 );
 
 // Admin-only routes
 router.delete('/:id',
   authenticateUser,
   isAdmin,
-  profileController.deleteProfile
+  controller.deleteProfile
 );
 
 router.put('/:id/admin',
   authenticateUser,
   isAdmin,
-  profileController.setAdminStatus
+  controller.setAdminStatus
 );
 
 export default router; 

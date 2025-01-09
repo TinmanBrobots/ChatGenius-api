@@ -28,9 +28,9 @@ const updateThemeSchema = z.object({
   theme: z.enum(['light', 'dark', 'system']),
 });
 
-class ProfileController {
+export class ProfileController {
   // GET /profiles/:id
-  async getProfile(req: Request, res: Response) {
+  async getProfile(req: Request, res: Response): Promise<void> {
     try {
       const profile = await profileService.getProfileById(req.params.id);
       res.json(profile);
@@ -40,7 +40,7 @@ class ProfileController {
   }
 
   // GET /profiles/username/:username
-  async getProfileByUsername(req: Request, res: Response) {
+  async getProfileByUsername(req: Request, res: Response): Promise<void> {
     try {
       const profile = await profileService.getProfileByUsername(req.params.username);
       res.json(profile);
@@ -50,7 +50,7 @@ class ProfileController {
   }
 
   // PATCH /profiles/:id
-  async updateProfile(req: Request, res: Response) {
+  async updateProfile(req: Request, res: Response): Promise<void> {
     try {
       const data = updateProfileSchema.parse(req.body);
       const profile = await profileService.updateProfile(req.params.id, data);
@@ -65,7 +65,7 @@ class ProfileController {
   }
 
   // PUT /profiles/:id/status
-  async updateStatus(req: Request, res: Response) {
+  async updateStatus(req: Request, res: Response): Promise<void> {
     try {
       const { status, custom_status } = updateStatusSchema.parse(req.body);
       await profileService.updateStatus(req.params.id, status, custom_status);
@@ -80,11 +80,12 @@ class ProfileController {
   }
 
   // GET /profiles/search
-  async searchProfiles(req: Request, res: Response) {
+  async searchProfiles(req: Request, res: Response): Promise<void> {
     try {
       const query = req.query.q as string;
       if (!query) {
-        return res.status(400).json({ error: 'Search query is required' });
+        res.status(400).json({ error: 'Search query is required' });
+        return;
       }
       const profiles = await profileService.searchProfiles(query);
       res.json(profiles);
@@ -94,7 +95,7 @@ class ProfileController {
   }
 
   // PUT /profiles/:id/notifications
-  async updateNotificationPreferences(req: Request, res: Response) {
+  async updateNotificationPreferences(req: Request, res: Response): Promise<void> {
     try {
       const preferences = updateNotificationPreferencesSchema.parse(req.body);
       await profileService.updateNotificationPreferences(req.params.id, preferences);
@@ -109,7 +110,7 @@ class ProfileController {
   }
 
   // PUT /profiles/:id/theme
-  async updateTheme(req: Request, res: Response) {
+  async updateTheme(req: Request, res: Response): Promise<void> {
     try {
       const { theme } = updateThemeSchema.parse(req.body);
       await profileService.updateThemePreference(req.params.id, theme);
@@ -125,7 +126,7 @@ class ProfileController {
 
   // Admin routes
   // DELETE /profiles/:id (admin only)
-  async deleteProfile(req: Request, res: Response) {
+  async deleteProfile(req: Request, res: Response): Promise<void> {
     try {
       await profileService.deleteProfile(req.params.id);
       res.json({ success: true });
@@ -135,7 +136,7 @@ class ProfileController {
   }
 
   // PUT /profiles/:id/admin (admin only)
-  async setAdminStatus(req: Request, res: Response) {
+  async setAdminStatus(req: Request, res: Response): Promise<void> {
     try {
       const isAdmin = z.boolean().parse(req.body.is_admin);
       await profileService.setAdminStatus(req.params.id, isAdmin);
@@ -148,6 +149,4 @@ class ProfileController {
       }
     }
   }
-}
-
-export const profileController = new ProfileController(); 
+} 

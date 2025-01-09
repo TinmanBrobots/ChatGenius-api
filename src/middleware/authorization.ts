@@ -1,51 +1,41 @@
 import { Request, Response, NextFunction } from 'express';
-import { profileService } from '../services/profile.service';
+import { supabase } from '../config/supabase';
 
-// Middleware to check if the authenticated user is the owner of the profile
-export async function isProfileOwner(
+export const isAdmin = async (
   req: Request,
   res: Response,
   next: NextFunction
-) {
+): Promise<void> => {
   try {
-    const userId = req.user?.id;
-    const profileId = req.params.id;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', req.user?.id)
+      .single();
 
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    if (userId !== profileId) {
-      return res.status(403).json({ error: 'Forbidden' });
+    if (!profile?.is_admin) {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
     }
 
     next();
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Failed to verify admin status' });
+    return;
   }
-}
+};
 
-// Middleware to check if the authenticated user is an admin
-export async function isAdmin(
+export const isProfileOwner = async (
   req: Request,
   res: Response,
   next: NextFunction
-) {
-  try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const profile = await profileService.getProfileById(userId);
-
-    if (!profile.is_admin) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
-    next();
-  } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+): Promise<void> => {
+  const profileId = req.params.id;
+  
+  if (profileId !== req.user?.id) {
+    res.status(403).json({ error: 'Access denied' });
+    return;
   }
-} 
+
+  next();
+}; 

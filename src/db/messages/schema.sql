@@ -1,25 +1,61 @@
--- Messages Table
-create table public.messages (
-  id uuid default uuid_generate_v4() primary key,
-  channel_id uuid references public.channels(id) on delete cascade,
-  user_id uuid references public.profiles(id) on delete set null,
-  content text not null,
-  is_edited boolean default false,
-  parent_message_id uuid references public.messages(id) on delete cascade,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+-- MESSAGES SCHEMA
+
+-- Drop existing enum type if exists (to allow recreation)
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'message_type') THEN
+        DROP TYPE message_type;
+    END IF;
+END $$;
+
+-- Create enum for message types
+CREATE TYPE message_type AS ENUM ('text', 'image', 'file', 'system');
+
+-- Drop existing trigger if exists
+DROP TRIGGER IF EXISTS update_messages_updated_at ON messages;
+DROP FUNCTION IF EXISTS update_messages_updated_at();
+
+-- Drop existing table if exists
+DROP TABLE IF EXISTS messages CASCADE;
+
+-- Create messages table
+CREATE TABLE messages (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+    sender_id UUID NOT NULL REFERENCES profiles(id),
+    content TEXT NOT NULL,
+    type message_type NOT NULL DEFAULT 'text',
+    parent_id UUID REFERENCES messages(id) ON DELETE CASCADE,
+    is_edited BOOLEAN DEFAULT FALSE NOT NULL,
+    edited_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    metadata JSONB DEFAULT '{}'::jsonb
 );
 
--- Enable RLS
-alter table public.messages enable row level security;
+-- Create indexes
+CREATE INDEX IF NOT EXISTS messages_channel_id_idx ON messages(channel_id);
+CREATE INDEX IF NOT EXISTS messages_sender_id_idx ON messages(sender_id);
+CREATE INDEX IF NOT EXISTS messages_parent_id_idx ON messages(parent_id);
+CREATE INDEX IF NOT EXISTS messages_created_at_idx ON messages(created_at);
+CREATE INDEX IF NOT EXISTS messages_type_idx ON messages(type);
+-- Add GIN index for full-text search on content
+CREATE INDEX IF NOT EXISTS messages_content_search_idx ON messages USING gin(to_tsvector('english', content));
 
--- Create indexes for better performance
-create index idx_messages_channel_id on public.messages(channel_id);
-create index idx_messages_parent_message_id on public.messages(parent_message_id);
-create index idx_messages_user_id on public.messages(user_id);
+-- Add trigger for updated_at
+CREATE OR REPLACE FUNCTION update_messages_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = TIMEZONE('utc', NOW());
+    IF TG_OP = 'UPDATE' AND NEW.content != OLD.content THEN
+        NEW.is_edited = TRUE;
+        NEW.edited_at = TIMEZONE('utc', NOW());
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
--- Create updated_at trigger
-create trigger handle_messages_updated_at
-  before update on public.messages
-  for each row
-  execute procedure public.handle_updated_at(); 
+CREATE TRIGGER update_messages_updated_at
+    BEFORE UPDATE ON messages
+    FOR EACH ROW
+    EXECUTE FUNCTION update_messages_updated_at(); 

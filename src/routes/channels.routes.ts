@@ -4,15 +4,25 @@ import { authenticateUser } from '../middleware/auth';
 
 const router = Router();
 
-// Channel routes
-router.get('/', authenticateUser, channelController.getChannels);
-router.post('/', authenticateUser, channelController.createChannel);
-router.get('/search', authenticateUser, channelController.searchChannels);
+// Apply auth middleware to all routes
+router.use(authenticateUser);
 
-// Channel member routes
-router.get('/:channelId/members', authenticateUser, channelController.getChannelMembers);
-router.post('/:channelId/members', authenticateUser, channelController.addChannelMember);
-router.delete('/:channelId/members/:userId', authenticateUser, channelController.removeChannelMember);
-router.patch('/:channelId/members/:userId/role', authenticateUser, channelController.updateMemberRole);
+// Channel Routes
+router.post('/', channelController.createChannel);
+router.get('/:id', channelController.getChannel);
+router.patch('/:id', channelController.updateChannel);
+router.post('/:id/archive', channelController.archiveChannel);
+router.delete('/:id', channelController.deleteChannel);
+router.get('/', channelController.listChannels);
+router.get('/search', channelController.searchChannels);
+
+// Channel Member Routes
+router.post('/:channelId/members', channelController.addMember);
+router.delete('/:channelId/members/:profileId', channelController.removeMember);
+router.patch('/:channelId/members/:profileId/role', channelController.updateMemberRole);
+router.get('/:channelId/members', channelController.getChannelMembers);
+router.patch('/:channelId/members/:profileId/settings', channelController.updateMemberSettings);
+router.post('/:channelId/members/:profileId/read', channelController.updateLastRead);
+router.post('/:channelId/members/:profileId/mute', channelController.toggleMute);
 
 export default router; 

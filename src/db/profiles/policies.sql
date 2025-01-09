@@ -3,10 +3,14 @@
 -- Enable RLS
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
--- SELECT: Everyone can view basic profile info
-CREATE POLICY "Anyone can view basic profile info"
+-- SELECT policies
+CREATE POLICY "Users can view their own complete profile"
 ON profiles FOR SELECT
-USING (true);
+USING (auth.uid() = id);
+
+CREATE POLICY "Users can view basic info of other profiles"
+ON profiles FOR SELECT
+USING (auth.uid() IS NOT NULL);
 
 -- INSERT: Only the authenticated user can insert their own profile
 CREATE POLICY "Users can only insert their own profile"
@@ -74,4 +78,4 @@ SELECT
 FROM profiles;
 
 -- Grant access to the view
-GRANT SELECT ON public_profiles TO authenticated;
+GRANT SELECT ON public_profiles TO authenticated; 
