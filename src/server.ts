@@ -13,12 +13,34 @@ dotenv.config();
 
 const app: Express = express();
 const httpServer = createServer(app);
+
+// Helper function to normalize origin URLs
+const normalizeOrigin = (origin: string) => {
+  return origin.endsWith('/') ? origin.slice(0, -1) : origin;
+};
+
+// CORS configuration
+const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+      'https://v0-chat-genius-51axsjppdpy.vercel.app',
+      // 'https://chat-genius-web.vercel.app'
+    ].map(normalizeOrigin);
+
+    if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
 const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
+  cors: corsOptions
 });
 
 // Store connected users
@@ -28,10 +50,7 @@ const connectedUsers = new Map<string, { socketId: string; status: string }>();
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
-}));
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Rate limiting
