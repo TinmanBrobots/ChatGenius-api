@@ -17,7 +17,7 @@ const io = new Server(httpServer, {
   cors: {
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     methods: ['GET', 'POST'],
-    credentials: true
+    // credentials: true
   }
 });
 
@@ -26,11 +26,11 @@ const connectedUsers = new Map<string, { socketId: string; status: string }>();
 
 // Middleware
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
+  // crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  // credentials: true
 }));
 app.use(express.json());
 
@@ -42,6 +42,11 @@ app.use(rateLimit({
 
 // Routes
 app.use('/api', routes);
+
+// Health check endpoint for Railway
+app.get('/api/health', (req: Request, res: Response) => {
+  res.status(200).json({ status: 'healthy' });
+});
 
 // Socket.io connection handling
 io.on('connection', async (socket) => {
@@ -141,7 +146,7 @@ app.use((err: Error, req: Request, res: Response, next: any) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 httpServer.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
