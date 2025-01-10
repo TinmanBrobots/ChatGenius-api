@@ -17,7 +17,7 @@ const io = new Server(httpServer, {
   cors: {
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     methods: ['GET', 'POST'],
-    // credentials: true
+    credentials: true
   }
 });
 
@@ -26,11 +26,11 @@ const connectedUsers = new Map<string, { socketId: string; status: string }>();
 
 // Middleware
 app.use(helmet({
-  // crossOriginResourcePolicy: { policy: "cross-origin" }
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  // credentials: true
+  credentials: true
 }));
 app.use(express.json());
 
