@@ -78,4 +78,4 @@ SELECT
 FROM profiles;
 
 -- Grant access to the view
-GRANT SELECT ON public_profiles TO authenticated; 
+GRANT SELECT ON public_profiles TO authenticated;

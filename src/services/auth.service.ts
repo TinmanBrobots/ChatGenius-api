@@ -96,8 +96,8 @@ export class AuthService {
     if (profileError) throw profileError;
 
     return {
-      ...data,
-      profile
+      session: data.session,
+      user: profile
     };
   }
 

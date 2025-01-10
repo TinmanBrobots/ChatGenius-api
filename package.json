@@ -9,7 +9,7 @@
     "build": "tsc",
     "test": "jest --config=jest.config.js",
     "test:watch": "jest --config=jest.config.js --watch",
-    "init-db": "ts-node scripts/init-database.ts"
+    "init-db": "ts-node scripts/init-database.ts && nodemon src/server.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.10",

@@ -116,7 +116,7 @@ export class MessageService {
       .from('messages')
       .select('*, sender:profiles(*), reactions:message_reactions(*)')
       .eq('channel_id', channelId)
-      .is('parent_id', null) // Only get top-level messages
+      // .is('parent_id', null) // Only get top-level messages
       .order('created_at', { ascending: false });
 
     if (options.limit) {

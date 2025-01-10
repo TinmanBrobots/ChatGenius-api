@@ -1,24 +1,37 @@
 -- CHANNEL MEMBERS POLICIES
 
--- Enable RLS
+CREATE OR REPLACE FUNCTION get_user_channel_ids(profile_id uuid)
+RETURNS SETOF uuid
+SECURITY DEFINER
+SET search_path = public
+LANGUAGE sql
+AS $$
+    SELECT cm.channel_id 
+    FROM channel_members cm
+    WHERE cm.profile_id = profile_id;
+$$;
+
+CREATE OR REPLACE FUNCTION get_user_channel_role(profile_id uuid, channel_id uuid)
+RETURNS text  -- Changed from SETOF uuid to text
+SECURITY DEFINER
+SET search_path = public
+LANGUAGE sql
+AS $$
+    SELECT cm.role 
+    FROM channel_members cm
+    WHERE cm.profile_id = profile_id
+    AND cm.channel_id = channel_id;
+$$;
+
+-- Enable RLS on the table
 ALTER TABLE channel_members ENABLE ROW LEVEL SECURITY;
 
--- SELECT policies
-CREATE POLICY "Users can view members in their channels or public channels"
+-- Create the policy using the security definer function
+CREATE POLICY "Users can view their own channel members"
 ON channel_members FOR SELECT
 USING (
-    EXISTS (
-        SELECT 1 FROM channels
-        WHERE channels.id = channel_members.channel_id
-        AND (
-            channels.type = 'public'
-            OR EXISTS (
-                SELECT 1 FROM channel_members AS cm
-                WHERE cm.channel_id = channels.id
-                AND cm.profile_id = auth.uid()
-            )
-        )
-        AND NOT channels.is_archived
+    channel_id IN (
+        SELECT get_user_channel_ids(auth.uid())
     )
 );
 
@@ -36,12 +49,9 @@ USING (
 CREATE POLICY "Channel owners and admins can add members"
 ON channel_members FOR INSERT
 WITH CHECK (
-    EXISTS (
-        SELECT 1 FROM channel_members AS cm
-        WHERE cm.channel_id = channel_members.channel_id
-        AND cm.profile_id = auth.uid()
-        AND cm.role IN ('owner', 'admin')
-    )
+    'owner' = get_user_channel_role(auth.uid(), channel_id)
+    OR
+    'admin' = get_user_channel_role(auth.uid(), channel_id)
     OR
     EXISTS (
         SELECT 1 FROM profiles
@@ -62,6 +72,17 @@ WITH CHECK (
     AND profile_id = auth.uid()
 );
 
+CREATE POLICY "Users can join private channels that they created"
+ON channel_members FOR INSERT
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM channels
+        WHERE channels.id = channel_members.channel_id
+        AND channels.type = 'private'
+        AND channels.created_by = auth.uid()
+    )
+);
+
 -- UPDATE policies
 CREATE POLICY "Members can update their own settings"
 ON channel_members FOR UPDATE
@@ -73,20 +94,14 @@ WITH CHECK (
 CREATE POLICY "Channel owners can update member roles"
 ON channel_members FOR UPDATE
 USING (
-    EXISTS (
-        SELECT 1 FROM channel_members AS cm
-        WHERE cm.channel_id = channel_members.channel_id
-        AND cm.profile_id = auth.uid()
-        AND cm.role = 'owner'
+    channel_id IN (
+        SELECT get_user_channel_ids(auth.uid())
     )
 )
 WITH CHECK (
-    EXISTS (
-        SELECT 1 FROM channel_members AS cm
-        WHERE cm.channel_id = channel_members.channel_id
-        AND cm.profile_id = auth.uid()
-        AND cm.role = 'owner'
-    )
+    'owner' = get_user_channel_role(auth.uid(), channel_id)
+    OR
+    'admin' = get_user_channel_role(auth.uid(), channel_id)
 );
 
 -- DELETE policies
@@ -97,10 +112,7 @@ USING (profile_id = auth.uid());
 CREATE POLICY "Channel owners can remove members"
 ON channel_members FOR DELETE
 USING (
-    EXISTS (
-        SELECT 1 FROM channel_members AS cm
-        WHERE cm.channel_id = channel_members.channel_id
-        AND cm.profile_id = auth.uid()
-        AND cm.role = 'owner'
-    )
+    'owner' = get_user_channel_role(auth.uid(), channel_id)
+    OR
+    'admin' = get_user_channel_role(auth.uid(), channel_id)
 ); 

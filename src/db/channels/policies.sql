@@ -4,22 +4,24 @@
 ALTER TABLE channels ENABLE ROW LEVEL SECURITY;
 
 -- SELECT policies
-CREATE POLICY "Users can view public channels"
+CREATE POLICY "Users can view channels"
 ON channels FOR SELECT
-USING (
-    type = 'public'::channel_type
-    AND NOT is_archived
-);
+USING (NOT is_archived);
 
-CREATE POLICY "Members can view private channels"
-ON channels FOR SELECT
-USING (
-    EXISTS (
-        SELECT 1 FROM channel_members
-        WHERE channel_members.channel_id = channels.id
-        AND channel_members.profile_id = auth.uid()
-    )
-);
+-- CREATE POLICY "Members can view private channels"
+-- ON channels FOR SELECT
+-- USING (
+--     type = 'private'::channel_type
+--     AND NOT is_archived
+--     AND (
+--         created_by = auth.uid()
+--         OR EXISTS (
+--             SELECT 1 FROM channel_members
+--             WHERE channel_members.channel_id = id
+--             AND channel_members.profile_id = auth.uid()
+--         )
+--     )
+-- );
 
 CREATE POLICY "Creator and admins can view all channels"
 ON channels FOR SELECT

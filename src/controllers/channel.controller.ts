@@ -6,7 +6,7 @@ export class ChannelController {
   // Channel Operations
   async createChannel(req: Request, res: Response) {
     try {
-      const channel = await channelService.createChannel(req.body);
+      const channel = await channelService.createChannel(req.body.channelData, req.body.member_ids);
       res.status(201).json(channel);
     } catch (error) {
       res.status(400).json({ error: (error as Error).message });
@@ -52,7 +52,7 @@ export class ChannelController {
   async listChannels(req: Request, res: Response) {
     try {
       const options = {
-        type: req.query.type as Channel['type'],
+        types: req.query.types as Channel['type'][],
         isArchived: req.query.isArchived === 'true',
         limit: parseInt(req.query.limit as string) || undefined,
         offset: parseInt(req.query.offset as string) || undefined

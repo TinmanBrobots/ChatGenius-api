@@ -40,20 +40,20 @@ CREATE INDEX IF NOT EXISTS channel_members_channel_id_idx ON channel_members(cha
 CREATE INDEX IF NOT EXISTS channel_members_profile_id_idx ON channel_members(profile_id);
 CREATE INDEX IF NOT EXISTS channel_members_role_idx ON channel_members(role);
 
--- Add trigger to automatically set owner role for channel creator
-CREATE OR REPLACE FUNCTION set_channel_owner()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF NEW.profile_id = (
-        SELECT created_by 
-        FROM channels 
-        WHERE id = NEW.channel_id
-    ) THEN
-        NEW.role = 'owner';
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- -- Add trigger to automatically set owner role for channel creator
+-- CREATE OR REPLACE FUNCTION set_channel_owner()
+-- RETURNS TRIGGER AS $$
+-- BEGIN
+--     IF NEW.profile_id = (
+--         SELECT created_by 
+--         FROM channels 
+--         WHERE id = NEW.channel_id
+--     ) THEN
+--         NEW.role = 'owner';
+--     END IF;
+--     RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER set_channel_owner
     BEFORE INSERT ON channel_members
