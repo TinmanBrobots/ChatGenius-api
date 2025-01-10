@@ -22,17 +22,38 @@ const normalizeOrigin = (origin: string) => {
 // CORS configuration
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    const allowedOrigins = [
-      process.env.FRONTEND_URL || 'http://localhost:3000',
-      'https://v0-chat-genius-51axsjppdpy.vercel.app',
-      // 'https://chat-genius-web.vercel.app'
-    ].map(normalizeOrigin);
-
-    if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      return callback(null, true);
     }
+
+    const normalizedOrigin = normalizeOrigin(origin);
+    
+    // In development, allow localhost origins
+    if (process.env.NODE_ENV === 'development') {
+      const allowedDevOrigins = [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3001'
+      ];
+      if (allowedDevOrigins.includes(normalizedOrigin)) {
+        return callback(null, true);
+      }
+    }
+
+    // In production, check against allowed origins
+    const allowedOrigins = [
+      process.env.FRONTEND_URL,
+      'https://v0-chat-genius-51axsjppdpy.vercel.app',
+      'https://chat-genius-web.vercel.app'
+    ].filter((url): url is string => typeof url === 'string').map(normalizeOrigin);
+
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,

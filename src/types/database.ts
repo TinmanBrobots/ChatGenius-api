@@ -103,4 +103,20 @@ export interface Attachment {
   file_size: number;
   file_url: string;
   created_at: Date;
+}
+
+export interface File {
+  id: string;
+  channel_id: string;
+  uploader_id: string;
+  name: string;
+  size: number;
+  mime_type: string;
+  storage_path: string;
+  created_at: Date;
+  updated_at: Date;
+  deleted_at: Date | null;
+  metadata: Record<string, any>;
+  // Joined data
+  uploader?: Profile;
 } 

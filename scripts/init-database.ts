@@ -70,13 +70,16 @@ async function initDatabase() {
       // await readSqlFile('channel_members/schema.sql'),
       // await readSqlFile('messages/schema.sql'),
       // await readSqlFile('message_reactions/schema.sql'),
+      // await readSqlFile('files/schema.sql'),
 
       // 5. Create policies
       await readSqlFile('profiles/policies.sql'),
       await readSqlFile('channels/policies.sql'),
       await readSqlFile('channel_members/policies.sql'),
       await readSqlFile('messages/policies.sql'),
-      await readSqlFile('message_reactions/policies.sql')
+      await readSqlFile('message_reactions/policies.sql'),
+      await readSqlFile('files/policies.sql'),
+      await readSqlFile('storage/policies.sql'),
     ];
 
     // Execute all SQL statements in sequence

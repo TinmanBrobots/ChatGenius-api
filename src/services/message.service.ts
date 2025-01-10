@@ -142,10 +142,30 @@ export class MessageService {
     limit?: number;
     offset?: number;
   } = {}): Promise<Message[]> {
+    const { data: { user } } = await client.auth.getUser();
+    if (!user) throw new Error('Unauthorized');
+
+    // First get the channels the user is a member of
+    const { data: userChannels, error: userChannelsError } = await client
+      .from('channel_members')
+      .select('channel_id')
+      .eq('profile_id', user.id);
+
+    if (!userChannels) return [];
+
+    const channelIds = userChannels.map(cm => cm.channel_id);
+
+    console.log(channelIds)
+
     let dbQuery = client
       .from('messages')
-      .select('*, sender:profiles(*)')
+      .select(`
+        *,
+        sender:profiles(*),
+        channel:channels(id, name)
+      `)
       .textSearch('content', query)
+      .in('channel_id', channelIds)
       .order('created_at', { ascending: false });
 
     if (options.channelId) {
@@ -163,7 +183,13 @@ export class MessageService {
     const { data, error } = await dbQuery;
 
     if (error) throw error;
-    return data || [];
+
+    // Transform the data to include channel_name
+    return (data || []).map(message => ({
+      ...message,
+      channel_name: message.channel?.name,
+      channel: undefined // Remove the nested channel object
+    }));
   }
 
   // Reaction Operations

@@ -20,6 +20,13 @@ const reactionSchema = z.object({
   emoji: z.string().min(1)
 });
 
+const searchQuerySchema = z.object({
+  q: z.string(),
+  channelId: z.string().optional(),
+  limit: z.string().optional(),
+  offset: z.string().optional()
+});
+
 export class MessageController {
   // Message Operations
   async createMessage(req: Request, res: Response) {
@@ -118,15 +125,23 @@ export class MessageController {
 
   async searchMessages(req: Request, res: Response) {
     try {
-      const options = {
-        channelId: req.query.channelId as string,
-        limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
-        offset: req.query.offset ? parseInt(req.query.offset as string) : undefined
-      };
-      const messages = await messageService.searchMessages(req.query.q as string, options);
+      const { q, channelId, limit, offset } = searchQuerySchema.parse(req.query);
+      console.log(q, channelId, limit, offset)
+
+      const messages = await messageService.searchMessages(q, {
+        channelId,
+        limit: limit ? parseInt(limit) : undefined,
+        offset: offset ? parseInt(offset) : undefined,
+      });
+
       res.json(messages);
     } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: 'Invalid search parameters' });
+      } else {
+        console.error('Search messages error:', error);
+        res.status(500).json({ error: 'Failed to search messages' });
+      }
     }
   }
 
