@@ -115,7 +115,6 @@ export class ChannelService {
     limit?: number;
     offset?: number;
   } = {}): Promise<Channel[]> {
-    console.log('listChannels', options)
     const { data: { user } } = await client.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 

@@ -54,6 +54,7 @@ export class ProfileService {
 
   // Status Management
   async updateStatus(id: string, status: Profile['status'], customStatus?: string): Promise<void> {
+		console.log('Updating status for user:', id, '\nwith status:', status, '\nand custom status:', customStatus);
     const { error } = await client
       .from('profiles')
       .update({

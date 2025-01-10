@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import routes from './routes';
+import { profileService } from './services/profile.service';
 
 // Load environment variables
 dotenv.config();
@@ -15,14 +16,21 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 
+// Store connected users
+const connectedUsers = new Map<string, { socketId: string; status: string }>();
+
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000'
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true
 }));
 app.use(express.json());
 
@@ -36,8 +44,38 @@ app.use(rateLimit({
 app.use('/api', routes);
 
 // Socket.io connection handling
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   console.log('A user connected');
+  
+  // Get user ID from auth token
+  const token = socket.handshake.auth.token;
+  const userId = socket.handshake.auth.userId;
+  
+  if (userId) {
+    // Update user's status to online
+    await profileService.updateStatus(userId, 'online').catch((error) => {
+      console.error('Error updating status1:', error);
+    });
+    
+    // Store socket connection
+    connectedUsers.set(userId, { socketId: socket.id, status: 'online' });
+    
+    // Broadcast user's online status to all connected clients
+    socket.broadcast.emit('status_update', {
+      profileId: userId,
+      status: 'online',
+      lastSeen: new Date().toISOString()
+    });
+
+    // Send current presence data to the newly connected user
+    const presenceData = Object.fromEntries(
+      Array.from(connectedUsers.entries()).map(([id, data]) => [
+        id,
+        { status: data.status }
+      ])
+    );
+    socket.emit('presence_sync', presenceData);
+  }
 
   socket.on('join_channel', (channelId) => {
     socket.join(channelId);
@@ -58,8 +96,42 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('disconnect', () => {
+  socket.on('status_change', async ({ status }) => {
+    if (userId) {
+      await profileService.updateStatus(userId, status).catch((error) => {
+        console.error('Error updating status2:', error);
+      });
+      connectedUsers.set(userId, { ...connectedUsers.get(userId)!, status });
+      socket.broadcast.emit('status_update', {
+        profileId: userId,
+        status,
+        lastSeen: new Date().toISOString()
+      });
+    }
+  });
+
+  socket.on('disconnect', async () => {
     console.log('User disconnected');
+    if (userId) {
+      // Update user's status to offline and last seen
+      const now = new Date().toISOString();
+      await profileService.updateStatus(userId, 'offline').catch((error) => {
+        console.error('Error updating status3:', error);
+      });
+      await profileService.updateLastSeen(userId).catch((error) => {
+        console.error('Error updating last seen:', error);
+      });
+      
+      // Remove from connected users
+      connectedUsers.delete(userId);
+      
+      // Broadcast offline status
+      socket.broadcast.emit('status_update', {
+        profileId: userId,
+        status: 'offline',
+        lastSeen: now
+      });
+    }
   });
 });
 
