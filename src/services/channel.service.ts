@@ -19,7 +19,7 @@ export class ChannelService {
       member_ids = [user.id, ...member_ids];
     }
 
-    // Start a transaction
+    // Create the channel
     const { data: channel, error } = await client
       .from('channels')
       .insert({
@@ -35,17 +35,14 @@ export class ChannelService {
     try {
       // For direct messages, add both users as regular members
       if (channel.type === 'direct') {
-        console.log('Adding members to direct message', member_ids)
         const memberPromises = member_ids!.map(profileId => 
           this.addMember(channel.id, profileId, 'member')
         );
         await Promise.all(memberPromises);
       } else {
-        console.log('Adding creator as owner', user.id)
         // For regular channels, add creator as owner and other members
         await this.addMember(channel.id, user.id, 'owner');
         
-        console.log('Adding other members', member_ids)
         if (member_ids && member_ids.length > 0) {
           const memberPromises = member_ids
             .filter(id => id !== user.id)
@@ -58,6 +55,7 @@ export class ChannelService {
       return channel;
     } catch (error) {
       // If adding members fails, attempt to clean up the channel
+      console.error('Error adding members. Cleaning up channel', channel.id)
       await this.deleteChannel(channel.id).catch(console.error);
       throw new Error('Failed to add channel members');
     }
@@ -174,21 +172,24 @@ export class ChannelService {
 
   // Channel Member Operations
   async addMember(channelId: string, profileId: string, role: ChannelMember['role'] = 'member'): Promise<ChannelMember> {
-    console.log(channelId, profileId)
-    const { data: member, error } = await client
+    const { error: createError } = await client
       .from('channel_members')
       .insert({
         channel_id: channelId,
         profile_id: profileId,
         role
-      })
-      .select()
-      .single();
-    
-    console.log('Member', JSON.stringify(member, null, 2));
-    console.log('Error', JSON.stringify(error, null, 2));
+      });
 
-    if (error) throw error;
+    if (createError) throw createError;
+
+    const { data: member, error: readError } = await client
+      .from('channel_members')
+      .select()
+      .eq('channel_id', channelId)
+      .eq('profile_id', profileId)
+      .single();
+
+    if (readError) throw readError;
     if (!member) throw new Error('Failed to add member');
 
     return member;
@@ -230,35 +231,6 @@ export class ChannelService {
     if (channelError) throw channelError;
     if (!channel) throw new Error('Channel not found');
 
-    // if (channel.type === 'public') {
-    //   // For public channels, get all users and format them as channel members
-    //   const { data: profiles, error: profilesError } = await client
-    //     .from('public_profiles')
-    //     .select('*');
-
-    //   if (profilesError) throw profilesError;
-    //   if (!profiles) return [];
-
-    //   // Convert profiles to channel members format with proper typing
-    //   return profiles.map(profile => ({
-    //     id: `${channelId}_${profile.id}`,
-    //     channel_id: channelId,
-    //     profile_id: profile.id,
-    //     role: 'member' as const,
-    //     joined_at: profile.created_at,
-    //     last_read_at: profile.created_at, // Use profile creation as last read date for consistency
-    //     is_muted: false,
-    //     settings: {
-    //       notifications: true,
-    //       thread_notifications: true,
-    //       mention_notifications: true
-    //     },
-    //     metadata: {},
-    //     profile
-    //   }));
-    // }
-
-    // For private channels, get explicit members
     const { data, error } = await client
       .from('channel_members')
       .select('*, profile:profiles(*)')

@@ -26,7 +26,7 @@ $$;
 -- Enable RLS on the table
 ALTER TABLE channel_members ENABLE ROW LEVEL SECURITY;
 
--- Create the policy using the security definer function
+-- SELECT policies
 CREATE POLICY "Users can view their own channel members"
 ON channel_members FOR SELECT
 USING (
@@ -72,13 +72,12 @@ WITH CHECK (
     AND profile_id = auth.uid()
 );
 
-CREATE POLICY "Users can join private channels that they created"
+CREATE POLICY "Users can join channels that they created"
 ON channel_members FOR INSERT
 WITH CHECK (
     EXISTS (
         SELECT 1 FROM channels
         WHERE channels.id = channel_members.channel_id
-        AND channels.type = 'private'
         AND channels.created_by = auth.uid()
     )
 );
@@ -109,10 +108,16 @@ CREATE POLICY "Members can leave channels"
 ON channel_members FOR DELETE
 USING (profile_id = auth.uid());
 
-CREATE POLICY "Channel owners can remove members"
+CREATE POLICY "Channel owners and admins can remove members"
 ON channel_members FOR DELETE
 USING (
     'owner' = get_user_channel_role(auth.uid(), channel_id)
     OR
     'admin' = get_user_channel_role(auth.uid(), channel_id)
+    OR
+    EXISTS (
+        SELECT 1 FROM profiles
+        WHERE profiles.id = auth.uid()
+        AND profiles.is_admin = true
+    )
 ); 

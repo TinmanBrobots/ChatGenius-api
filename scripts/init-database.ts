@@ -67,7 +67,7 @@ async function initDatabase() {
       // // 4. Create schemas
       // await readSqlFile('profiles/schema.sql'),
       // await readSqlFile('channels/schema.sql'),
-      // await readSqlFile('channel_members/schema.sql'),
+      await readSqlFile('channel_members/schema.sql'),
       // await readSqlFile('messages/schema.sql'),
       // await readSqlFile('message_reactions/schema.sql'),
       // await readSqlFile('files/schema.sql'),
@@ -80,6 +80,15 @@ async function initDatabase() {
       await readSqlFile('message_reactions/policies.sql'),
       await readSqlFile('files/policies.sql'),
       await readSqlFile('storage/policies.sql'),
+
+      // 6. Create functions
+      // await readSqlFile('profiles/functions.sql'),
+      // await readSqlFile('channels/functions.sql'),
+      await readSqlFile('channel_members/functions.sql'),
+      // await readSqlFile('messages/functions.sql'),
+      // await readSqlFile('message_reactions/functions.sql'),
+      // await readSqlFile('files/functions.sql'),
+      // await readSqlFile('storage/functions.sql'),
     ];
 
     // Execute all SQL statements in sequence

@@ -8,58 +8,33 @@ CREATE POLICY "Users can view channels"
 ON channels FOR SELECT
 USING (NOT is_archived);
 
--- CREATE POLICY "Members can view private channels"
--- ON channels FOR SELECT
--- USING (
---     type = 'private'::channel_type
---     AND NOT is_archived
---     AND (
---         created_by = auth.uid()
---         OR EXISTS (
---             SELECT 1 FROM channel_members
---             WHERE channel_members.channel_id = id
---             AND channel_members.profile_id = auth.uid()
---         )
---     )
--- );
-
-CREATE POLICY "Creator and admins can view all channels"
+CREATE POLICY "Members can view private channels"
 ON channels FOR SELECT
 USING (
-    EXISTS (
-        SELECT 1 FROM profiles
-        WHERE profiles.id = auth.uid()
-        AND (
-            profiles.is_admin = true
-            OR profiles.id = channels.created_by
+    type = 'private'::channel_type
+    AND NOT is_archived
+    AND (
+        channels.id IN (
+            SELECT get_user_channel_ids(auth.uid())
         )
     )
 );
 
--- INSERT policies
-CREATE POLICY "Users can create public channels"
-ON channels FOR INSERT
-WITH CHECK (
-    type = 'public'::channel_type
-    AND auth.uid() IS NOT NULL
-);
-
-CREATE POLICY "Only admins can create private channels"
-ON channels FOR INSERT
-WITH CHECK (
-    type = 'private'::channel_type
-    AND EXISTS (
+CREATE POLICY "Admins can view all channels"
+ON channels FOR SELECT
+USING (
+    EXISTS (
         SELECT 1 FROM profiles
         WHERE profiles.id = auth.uid()
         AND profiles.is_admin = true
     )
 );
 
-CREATE POLICY "Any user can create direct message channels"
+-- INSERT policies
+CREATE POLICY "Users can create channels"
 ON channels FOR INSERT
 WITH CHECK (
-    type = 'direct'::channel_type
-    AND auth.uid() IS NOT NULL
+    auth.uid() IS NOT NULL
 );
 
 -- UPDATE policies
