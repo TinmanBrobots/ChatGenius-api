@@ -80,13 +80,13 @@ app.use(rateLimit({
   max: 100 // limit each IP to 100 requests per windowMs
 }));
 
-// Routes
-app.use('/api', routes);
-
 // Health check endpoint for Railway
-app.get('/api/health', (req: Request, res: Response) => {
+app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'healthy' });
 });
+
+// Routes
+app.use('/api', routes);
 
 // Socket.io connection handling
 io.on('connection', async (socket) => {
