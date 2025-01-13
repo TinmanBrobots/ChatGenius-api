@@ -67,7 +67,7 @@ async function initDatabase() {
       // // 4. Create schemas
       // await readSqlFile('profiles/schema.sql'),
       // await readSqlFile('channels/schema.sql'),
-      await readSqlFile('channel_members/schema.sql'),
+      // await readSqlFile('channel_members/schema.sql'),
       // await readSqlFile('messages/schema.sql'),
       // await readSqlFile('message_reactions/schema.sql'),
       // await readSqlFile('files/schema.sql'),

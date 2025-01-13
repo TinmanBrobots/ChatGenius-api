@@ -82,6 +82,16 @@ WITH CHECK (
     )
 );
 
+CREATE POLICY "Users can add members to direct messages"
+ON channel_members FOR INSERT
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM channels
+        WHERE channels.id = channel_members.channel_id
+        AND channels.type = 'direct'
+    )
+);
+
 -- UPDATE policies
 CREATE POLICY "Members can update their own settings"
 ON channel_members FOR UPDATE

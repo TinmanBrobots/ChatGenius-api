@@ -126,7 +126,10 @@ export class ChannelService {
             id,
             username,
             full_name,
-            avatar_url
+            avatar_url,
+            status,
+            last_seen_at,
+            custom_status
           )
         )
       `)
