@@ -10,7 +10,15 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY || !process.env.
 // Regular client for normal operations
 export const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_ANON_KEY,
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+      flowType: 'pkce'
+    }
+  }
 );
 
 // Admin client for operations that need to bypass RLS
