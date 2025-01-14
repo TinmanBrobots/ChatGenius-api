@@ -6,7 +6,6 @@ export class AuthService {
   private client: SupabaseClient<Database>;
 
   constructor(token?: string) {
-    console.log('token', token);
     this.client = token ? getClientWithToken(token) : supabaseAdmin;
   }
 
@@ -28,7 +27,7 @@ export class AuthService {
     }
 
     // Create auth user with regular client and require email verification
-    const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
+    const { data: authData, error: authError } = await this.client.auth.signUp({
       email,
       password,
       options: {
