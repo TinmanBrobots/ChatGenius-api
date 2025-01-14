@@ -92,14 +92,15 @@ app.use('/api', routes);
 io.on('connection', async (socket) => {
   console.log('A user connected');
   
+  const token = socket.handshake.auth.token;
   const userId = socket.handshake.auth.userId;
-  if (!userId) {
+  if (!userId || !token) {
     socket.disconnect(true);
     return;
   }
 
   // Handle connection with presence service
-  await presenceService.handleConnection(socket, userId);
+  await presenceService.handleConnection(socket, userId, token);
 
   // Handle channel events
   socket.on('join_channel', (channelId) => {
@@ -112,6 +113,10 @@ io.on('connection', async (socket) => {
 
   socket.on('send_message', async (message) => {
     io.to(message.channel_id).emit('new_message', message);
+  });
+
+  socket.on('reaction_update', async (reaction) => {
+    io.to(reaction.channel_id).emit('reaction_update', reaction);
   });
 
   socket.on('typing', (data) => {

@@ -1,20 +1,30 @@
-import { supabase, supabaseAdmin } from '../config/supabase';
-import { Message, MessageReaction } from '../types/database';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { supabaseAdmin, getClientWithToken } from '../config/supabase';
+import { Database, Message, MessageReaction } from '../types/database';
 
-// Use admin client in test environment to bypass RLS
-const client = process.env.NODE_ENV === 'test' ? supabaseAdmin : supabase;
+interface ChannelMemberBasic {
+  channel_id: string;
+}
+
+interface MessageWithChannel extends Message {
+  channel?: {
+    name: string;
+  };
+}
 
 export class MessageService {
+  private client: SupabaseClient<Database>;
+
+  constructor(token: string) {
+    this.client = process.env.NODE_ENV === 'test' ? supabaseAdmin : getClientWithToken(token);
+  }
+
   // Core Message Operations
   async createMessage(data: Partial<Message>): Promise<Message> {
-    const { data: { user } } = await client.auth.getUser();
+    const { data: { user } } = await this.client.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    console.log(data)
-
-    console.log({...data, sender_id: user.id})
-
-    const { data: message, error } = await client
+    const { data: message, error } = await this.client
       .from('messages')
       .insert({
         ...data,
@@ -30,7 +40,7 @@ export class MessageService {
   }
 
   async getMessage(id: string): Promise<Message> {
-    const { data: message, error } = await client
+    const { data: message, error } = await this.client
       .from('messages')
       .select('*, sender:profiles(*), reactions:message_reactions(*)')
       .eq('id', id)
@@ -43,7 +53,7 @@ export class MessageService {
   }
 
   async updateMessage(id: string, content: string): Promise<Message> {
-    const { data: message, error } = await client
+    const { data: message, error } = await this.client
       .from('messages')
       .update({ content })
       .eq('id', id)
@@ -57,7 +67,7 @@ export class MessageService {
   }
 
   async deleteMessage(id: string): Promise<void> {
-    const { error } = await client
+    const { error } = await this.client
       .from('messages')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
@@ -66,7 +76,7 @@ export class MessageService {
   }
 
   async restoreMessage(id: string): Promise<void> {
-    const { error } = await client
+    const { error } = await this.client
       .from('messages')
       .update({ deleted_at: null })
       .eq('id', id);
@@ -76,10 +86,10 @@ export class MessageService {
 
   // Thread Operations
   async createThreadReply(parentId: string, data: Partial<Message>): Promise<Message> {
-    const { data: { user } } = await client.auth.getUser();
+    const { data: { user } } = await this.client.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    const { data: message, error } = await client
+    const { data: message, error } = await this.client
       .from('messages')
       .insert({
         ...data,
@@ -96,7 +106,7 @@ export class MessageService {
   }
 
   async getThreadReplies(parentId: string): Promise<Message[]> {
-    const { data, error } = await client
+    const { data, error } = await this.client
       .from('messages')
       .select('*, sender:profiles(*), reactions:message_reactions(*)')
       .eq('parent_id', parentId)
@@ -112,11 +122,10 @@ export class MessageService {
     before?: Date;
     after?: Date;
   } = {}): Promise<Message[]> {
-    let query = client
+    let query = this.client
       .from('messages')
       .select('*, sender:profiles(*), reactions:message_reactions(*)')
       .eq('channel_id', channelId)
-      // .is('parent_id', null) // Only get top-level messages
       .order('created_at', { ascending: false });
 
     if (options.limit) {
@@ -142,22 +151,20 @@ export class MessageService {
     limit?: number;
     offset?: number;
   } = {}): Promise<Message[]> {
-    const { data: { user } } = await client.auth.getUser();
+    const { data: { user } } = await this.client.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
     // First get the channels the user is a member of
-    const { data: userChannels, error: userChannelsError } = await client
+    const { data: userChannels, error: userChannelsError } = await this.client
       .from('channel_members')
       .select('channel_id')
       .eq('profile_id', user.id);
 
     if (!userChannels) return [];
 
-    const channelIds = userChannels.map(cm => cm.channel_id);
+    const channelIds = userChannels.map((cm: ChannelMemberBasic) => cm.channel_id);
 
-    console.log(channelIds)
-
-    let dbQuery = client
+    let dbQuery = this.client
       .from('messages')
       .select(`
         *,
@@ -184,20 +191,19 @@ export class MessageService {
 
     if (error) throw error;
 
-    // Transform the data to include channel_name
-    return (data || []).map(message => ({
+    return (data || []).map((message: MessageWithChannel) => ({
       ...message,
       channel_name: message.channel?.name,
-      channel: undefined // Remove the nested channel object
+      channel: undefined
     }));
   }
 
   // Reaction Operations
   async addReaction(messageId: string, emoji: string): Promise<MessageReaction> {
-    const { data: { user } } = await client.auth.getUser();
+    const { data: { user } } = await this.client.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    const { data: reaction, error } = await client
+    const { data: reaction, error } = await this.client
       .from('message_reactions')
       .insert({
         message_id: messageId,
@@ -214,10 +220,10 @@ export class MessageService {
   }
 
   async removeReaction(messageId: string, emoji: string): Promise<void> {
-    const { data: { user } } = await client.auth.getUser();
+    const { data: { user } } = await this.client.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    const { error } = await client
+    const { error } = await this.client
       .from('message_reactions')
       .delete()
       .eq('message_id', messageId)
@@ -228,7 +234,7 @@ export class MessageService {
   }
 
   async getReactions(messageId: string): Promise<MessageReaction[]> {
-    const { data, error } = await client
+    const { data, error } = await this.client
       .from('message_reactions')
       .select('*, profile:profiles(*)')
       .eq('message_id', messageId);
@@ -236,6 +242,4 @@ export class MessageService {
     if (error) throw error;
     return data || [];
   }
-}
-
-export const messageService = new MessageService(); 
+} 

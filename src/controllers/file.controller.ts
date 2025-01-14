@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { fileService } from '../services/file.service';
+import { FileService } from '../services/file.service';
 import multer from 'multer';
 
 // Configure multer for memory storage
@@ -26,6 +26,7 @@ export class FileController {
           return res.status(400).json({ error: 'No file provided' });
         }
 
+        const fileService = new FileService(req.token);
         const uploadedFile = await fileService.uploadFile(channelId, file, userId);
         res.status(201).json(uploadedFile);
       } catch (error) {
@@ -39,6 +40,7 @@ export class FileController {
       const { fileId } = req.params;
       const userId = req.user!.id;
 
+      const fileService = new FileService(req.token);
       const signedUrl = await fileService.generatePresignedUrl(fileId, userId);
       res.json({ url: signedUrl });
     } catch (error) {
@@ -51,6 +53,7 @@ export class FileController {
       const { fileId } = req.params;
       const userId = req.user!.id;
 
+      const fileService = new FileService(req.token);
       const file = await fileService.getFileById(fileId, userId);
       res.json(file);
     } catch (error) {
@@ -71,6 +74,7 @@ export class FileController {
         sortOrder: sortOrder as 'asc' | 'desc' | undefined,
       };
 
+      const fileService = new FileService(req.token);
       const files = await fileService.getChannelFiles(channelId, userId, options);
       res.json(files);
     } catch (error) {
@@ -83,6 +87,7 @@ export class FileController {
       const { fileId } = req.params;
       const userId = req.user!.id;
 
+      const fileService = new FileService(req.token);
       await fileService.deleteFile(fileId, userId);
       res.status(204).send();
     } catch (error) {
@@ -96,6 +101,7 @@ export class FileController {
       const userId = req.user!.id;
       const metadata = req.body;
 
+      const fileService = new FileService(req.token);
       const updatedFile = await fileService.updateFileMetadata(fileId, metadata, userId);
       res.json(updatedFile);
     } catch (error) {

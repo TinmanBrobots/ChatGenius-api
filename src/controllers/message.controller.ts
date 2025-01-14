@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
-import { messageService } from '../services/message.service';
+import { MessageService } from '../services/message.service';
 import { z } from 'zod';
-import { Message } from '@/types/database';
 
 // Validation schemas
 const createMessageSchema = z.object({
@@ -31,116 +30,127 @@ export class MessageController {
   // Message Operations
   async createMessage(req: Request, res: Response) {
     try {
-      const data = createMessageSchema.parse(req.body) as Partial<Message>;
+      const messageService = new MessageService(req.token);
+      const data = createMessageSchema.parse(req.body);
       const message = await messageService.createMessage(data);
       res.status(201).json(message);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: error.errors });
       } else {
-        res.status(400).json({ error: (error as Error).message });
+        res.status(400).json({ error: error.message });
       }
     }
   }
 
   async getMessage(req: Request, res: Response) {
     try {
+      const messageService = new MessageService(req.token);
       const message = await messageService.getMessage(req.params.id);
       res.json(message);
-    } catch (error) {
-      res.status(404).json({ error: (error as Error).message });
+    } catch (error: any) {
+      res.status(404).json({ error: error.message });
     }
   }
 
   async updateMessage(req: Request, res: Response) {
     try {
+      const messageService = new MessageService(req.token);
       const { content } = updateMessageSchema.parse(req.body);
       const message = await messageService.updateMessage(req.params.id, content);
       res.json(message);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: error.errors });
       } else {
-        res.status(400).json({ error: (error as Error).message });
+        res.status(400).json({ error: error.message });
       }
     }
   }
 
   async deleteMessage(req: Request, res: Response) {
     try {
+      const messageService = new MessageService(req.token);
       await messageService.deleteMessage(req.params.id);
-      res.status(204).send();
-    } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
+      res.json({ message: 'Message deleted successfully' });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   }
 
   async restoreMessage(req: Request, res: Response) {
     try {
+      const messageService = new MessageService(req.token);
       await messageService.restoreMessage(req.params.id);
-      res.status(204).send();
-    } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
+      res.json({ message: 'Message restored successfully' });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   }
 
   // Thread Operations
   async createThreadReply(req: Request, res: Response) {
     try {
-      const data = createMessageSchema.parse(req.body) as Partial<Message>;
+      const messageService = new MessageService(req.token);
+      const data = createMessageSchema.parse(req.body);
       const message = await messageService.createThreadReply(req.params.parentId, data);
       res.status(201).json(message);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: error.errors });
       } else {
-        res.status(400).json({ error: (error as Error).message });
+        res.status(400).json({ error: error.message });
       }
     }
   }
 
   async getThreadReplies(req: Request, res: Response) {
     try {
+      const messageService = new MessageService(req.token);
       const messages = await messageService.getThreadReplies(req.params.parentId);
       res.json(messages);
-    } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   }
 
   // Channel Messages
   async getChannelMessages(req: Request, res: Response) {
     try {
-      const options = {
-        limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
-        before: req.query.before ? new Date(req.query.before as string) : undefined,
-        after: req.query.after ? new Date(req.query.after as string) : undefined
-      };
-      const messages = await messageService.getChannelMessages(req.params.channelId, options);
+      const messageService = new MessageService(req.token);
+      const messages = await messageService.getChannelMessages(
+        req.params.channelId,
+        {
+          limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+          before: req.query.before ? new Date(req.query.before as string) : undefined,
+          after: req.query.after ? new Date(req.query.after as string) : undefined
+        }
+      );
       res.json(messages);
-    } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   }
 
   async searchMessages(req: Request, res: Response) {
     try {
-      const { q, channelId, limit, offset } = searchQuerySchema.parse(req.query);
-      console.log(q, channelId, limit, offset)
-
-      const messages = await messageService.searchMessages(q, {
-        channelId,
-        limit: limit ? parseInt(limit) : undefined,
-        offset: offset ? parseInt(offset) : undefined,
-      });
-
+      const messageService = new MessageService(req.token);
+      const { q: query, channelId, limit, offset } = searchQuerySchema.parse(req.query);
+      
+      const messages = await messageService.searchMessages(
+        query,
+        {
+          channelId: channelId,
+          limit: limit ? parseInt(limit) : undefined,
+          offset: offset ? parseInt(offset) : undefined
+        }
+      );
       res.json(messages);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: 'Invalid search parameters' });
       } else {
-        console.error('Search messages error:', error);
-        res.status(500).json({ error: 'Failed to search messages' });
+        res.status(400).json({ error: error.message });
       }
     }
   }
@@ -148,33 +158,36 @@ export class MessageController {
   // Reaction Operations
   async addReaction(req: Request, res: Response) {
     try {
+      const messageService = new MessageService(req.token);
       const { emoji } = reactionSchema.parse(req.body);
       const reaction = await messageService.addReaction(req.params.messageId, emoji);
       res.status(201).json(reaction);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: error.errors });
       } else {
-        res.status(400).json({ error: (error as Error).message });
+        res.status(400).json({ error: error.message });
       }
     }
   }
 
   async removeReaction(req: Request, res: Response) {
     try {
+      const messageService = new MessageService(req.token);
       await messageService.removeReaction(req.params.messageId, req.params.emoji);
-      res.status(204).send();
-    } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
+      res.json({ message: 'Reaction removed successfully' });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   }
 
   async getReactions(req: Request, res: Response) {
     try {
+      const messageService = new MessageService(req.token);
       const reactions = await messageService.getReactions(req.params.messageId);
       res.json(reactions);
-    } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   }
 }

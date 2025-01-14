@@ -1,10 +1,9 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { File } from '../types/database';
+import { Database, File } from '../types/database';
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../utils/errors';
-import { supabase, supabaseAdmin } from '../config/supabase';
+import { getClientWithToken, supabaseAdmin } from '../config/supabase';
 
-// Use admin client in test environment to bypass RLS
-const client = process.env.NODE_ENV === 'test' ? supabaseAdmin : supabase;
+// Use admin this.client in test environment to bypass RLS
 
 interface PaginationOptions {
   page?: number;
@@ -14,6 +13,7 @@ interface PaginationOptions {
 }
 
 export class FileService {
+  private client: SupabaseClient<Database>;
   private async initializeStorage(): Promise<void> {
     const { data: buckets } = await supabaseAdmin.storage.listBuckets();
     const filesBucket = buckets?.find(bucket => bucket.name === 'files');
@@ -32,13 +32,14 @@ export class FileService {
     }
   }
 
-  constructor() {
+  constructor(token: string) {
     // Initialize storage bucket when service is instantiated
     this.initializeStorage().catch(console.error);
+    this.client = getClientWithToken(token);
   }
 
   private async checkChannelMembership(channelId: string, userId: string): Promise<boolean> {
-    const { data } = await client
+    const { data } = await this.client
       .from('channel_members')
       .select('id')
       .eq('channel_id', channelId)
@@ -61,7 +62,7 @@ export class FileService {
 
     // Upload file to Supabase Storage
     const storagePath = `channels/${channelId}/${Date.now()}-${file.originalname}`;
-    const { error: uploadError } = await client.storage
+    const { error: uploadError } = await this.client.storage
       .from('files')
       .upload(storagePath, file.buffer, {
         contentType: file.mimetype,
@@ -73,7 +74,7 @@ export class FileService {
     }
 
     // Create file record in database
-    const { data: fileRecord, error: dbError } = await client
+    const { data: fileRecord, error: dbError } = await this.client
       .from('files')
       .insert({
         channel_id: channelId,
@@ -89,7 +90,7 @@ export class FileService {
 
     if (dbError) {
       // Cleanup storage if database insert fails
-      await client.storage.from('files').remove([storagePath]);
+      await this.client.storage.from('files').remove([storagePath]);
       throw new BadRequestError(`Failed to create file record: ${dbError.message}`);
     }
 
@@ -97,7 +98,7 @@ export class FileService {
   }
 
   async generatePresignedUrl(fileId: string, userId: string): Promise<string> {
-    const { data: file } = await client
+    const { data: file } = await this.client
       .from('files')
       .select('storage_path, channel_id')
       .eq('id', fileId)
@@ -113,7 +114,7 @@ export class FileService {
       throw new UnauthorizedError('User is not a member of this channel');
     }
 
-    const { data, error } = await client.storage
+    const { data, error } = await this.client.storage
       .from('files')
       .createSignedUrl(file.storage_path, 3600); // 1 hour expiry
 
@@ -125,7 +126,7 @@ export class FileService {
   }
 
   async getFileById(fileId: string, userId: string): Promise<File> {
-    const { data: file, error } = await client
+    const { data: file, error } = await this.client
       .from('files')
       .select('*, uploader:profiles(*)')
       .eq('id', fileId)
@@ -164,7 +165,7 @@ export class FileService {
 
     const offset = (page - 1) * limit;
 
-    const query = client
+    const query = this.client
       .from('files')
       .select('*, uploader:profiles(*)', { count: 'exact' })
       .eq('channel_id', channelId)
@@ -185,7 +186,7 @@ export class FileService {
   }
 
   async deleteFile(fileId: string, userId: string): Promise<void> {
-    const { data: file } = await client
+    const { data: file } = await this.client
       .from('files')
       .select('storage_path, uploader_id, channel_id')
       .eq('id', fileId)
@@ -196,7 +197,7 @@ export class FileService {
     }
 
     // Check if user is file uploader or channel admin
-    const { data: channelMember } = await client
+    const { data: channelMember } = await this.client
       .from('channel_members')
       .select('role')
       .eq('channel_id', file.channel_id)
@@ -211,7 +212,7 @@ export class FileService {
     }
 
     // Soft delete in database
-    const { error: dbError } = await client
+    const { error: dbError } = await this.client
       .from('files')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', fileId);
@@ -221,7 +222,7 @@ export class FileService {
     }
 
     // Remove from storage
-    const { error: storageError } = await client.storage
+    const { error: storageError } = await this.client.storage
       .from('files')
       .remove([file.storage_path]);
 
@@ -235,7 +236,7 @@ export class FileService {
     metadata: Partial<File>,
     userId: string
   ): Promise<File> {
-    const { data: file } = await client
+    const { data: file } = await this.client
       .from('files')
       .select('uploader_id')
       .eq('id', fileId)
@@ -257,7 +258,7 @@ export class FileService {
       return acc;
     }, {} as Record<string, any>);
 
-    const { data: updatedFile, error } = await client
+    const { data: updatedFile, error } = await this.client
       .from('files')
       .update(updates)
       .eq('id', fileId)
@@ -271,5 +272,3 @@ export class FileService {
     return updatedFile as File;
   }
 }
-
-export const fileService = new FileService(); 

@@ -1,11 +1,12 @@
 import { Server, Socket } from 'socket.io';
-import { profileService } from './profile.service';
+import { ProfileService } from './profile.service';
 
 interface ConnectedUser {
   socketId: string;
   status: 'online' | 'offline' | 'away' | 'busy';
   lastActivity: string;
   customStatus?: string;
+  token: string;
 }
 
 interface PresenceData {
@@ -59,16 +60,19 @@ export class PresenceService {
     }
   }
 
-  public async handleConnection(socket: Socket, userId: string) {
+  public async handleConnection(socket: Socket, userId: string, token: string) {
     try {
+      const profileService = new ProfileService(token);
+      
       // Update user's status to online
       await profileService.updateStatus(userId, 'online');
       
-      // Store socket connection with activity timestamp
+      // Store socket connection with activity timestamp and token
       this.connectedUsers.set(userId, {
         socketId: socket.id,
         status: 'online',
-        lastActivity: new Date().toISOString()
+        lastActivity: new Date().toISOString(),
+        token
       });
       
       // Broadcast user's online status
@@ -125,6 +129,7 @@ export class PresenceService {
   private async handleActive(userId: string) {
     const userData = this.connectedUsers.get(userId);
     if (userData && userData.status !== 'online') {
+      const profileService = new ProfileService(userData.token);
       await profileService.updateStatus(userId, 'online');
       this.connectedUsers.set(userId, {
         ...userData,
@@ -141,6 +146,7 @@ export class PresenceService {
   private async handleAway(userId: string) {
     const userData = this.connectedUsers.get(userId);
     if (userData && userData.status === 'online') {
+      const profileService = new ProfileService(userData.token);
       await profileService.updateStatus(userId, 'away');
       this.connectedUsers.set(userId, {
         ...userData,
@@ -155,29 +161,34 @@ export class PresenceService {
   }
 
   private async handleStatusChange(userId: string, status: ConnectedUser['status'], customStatus?: string) {
-    await profileService.updateStatus(userId, status);
     const userData = this.connectedUsers.get(userId);
     if (userData) {
+      const profileService = new ProfileService(userData.token);
+      await profileService.updateStatus(userId, status);
       this.connectedUsers.set(userId, {
         ...userData,
         status,
         customStatus,
         lastActivity: new Date().toISOString()
       });
+      this.broadcastPresenceUpdate(userId, {
+        status,
+        customStatus,
+        lastSeen: new Date().toISOString()
+      });
     }
-    this.broadcastPresenceUpdate(userId, {
-      status,
-      customStatus,
-      lastSeen: new Date().toISOString()
-    });
   }
 
   public async handleDisconnect(userId: string) {
+    const userData = this.connectedUsers.get(userId);
     const now = new Date().toISOString();
     
     try {
-      await profileService.updateStatus(userId, 'offline');
-      await profileService.updateLastSeen(userId);
+      if (userData) {
+        const profileService = new ProfileService(userData.token);
+        await profileService.updateStatus(userId, 'offline');
+        await profileService.updateLastSeen(userId);
+      }
       this.connectedUsers.delete(userId);
       
       this.broadcastPresenceUpdate(userId, {

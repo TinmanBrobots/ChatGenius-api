@@ -1,7 +1,14 @@
-import { supabase, supabaseAdmin } from '../config/supabase';
-import { Profile } from '../types/database';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { getClientWithToken, supabase, supabaseAdmin } from '../config/supabase';
+import { Database, Profile } from '../types/database';
 
 export class AuthService {
+  private client: SupabaseClient<Database>;
+
+  constructor(token?: string) {
+    this.client = token ? getClientWithToken(token) : supabaseAdmin;
+  }
+
   async registerUser(
     email: string, 
     password: string, 
@@ -9,7 +16,7 @@ export class AuthService {
     full_name: string
   ) {
     // First check if username is already taken
-    const { data: existingUser } = await supabaseAdmin
+    const { data: existingUser } = await this.client
       .from('profiles')
       .select('username')
       .eq('username', username)
@@ -20,7 +27,7 @@ export class AuthService {
     }
 
     // Create auth user with regular client and require email verification
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await this.client.auth.signUp({
       email,
       password,
       options: {
@@ -36,7 +43,7 @@ export class AuthService {
     if (!authData.user) throw new Error('Failed to create user');
 
     // Create profile with admin client to bypass RLS
-    const { error: profileError } = await supabaseAdmin
+    const { error: profileError } = await this.client
       .from('profiles')
       .insert({
         id: authData.user.id,
@@ -57,7 +64,7 @@ export class AuthService {
 
     if (profileError) {
       // If profile creation fails, delete the auth user
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      await this.client.auth.admin.deleteUser(authData.user.id);
       throw profileError;
     }
 
@@ -66,7 +73,7 @@ export class AuthService {
   }
 
   async loginUser(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await this.client.auth.signInWithPassword({
       email,
       password,
     });
@@ -74,7 +81,7 @@ export class AuthService {
     if (error) throw error;
 
     // Update profile status to online and last_seen
-    const { error: updateError } = await supabase
+    const { error: updateError } = await this.client
       .from('profiles')
       .update({
         status: 'online',
@@ -87,7 +94,7 @@ export class AuthService {
     }
 
     // Get full profile data
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await this.client
       .from('profiles')
       .select('*')
       .eq('id', data.user.id)
@@ -103,7 +110,7 @@ export class AuthService {
 
   async logoutUser(userId: string) {
     // Update status to offline before logging out
-    const { error: updateError } = await supabase
+    const { error: updateError } = await this.client
       .from('profiles')
       .update({
         status: 'offline',
@@ -115,12 +122,12 @@ export class AuthService {
       console.error('Failed to update user status:', updateError);
     }
 
-    const { error } = await supabase.auth.signOut();
+    const { error } = await this.client.auth.signOut();
     if (error) throw error;
   }
 
   async requestPasswordReset(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await this.client.auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.FRONTEND_URL}/reset-password`
     });
 
@@ -128,14 +135,14 @@ export class AuthService {
   }
 
   async updatePassword(userId: string, newPassword: string) {
-    const { error } = await supabase.auth.updateUser({
+    const { error } = await this.client.auth.updateUser({
       password: newPassword
     });
 
     if (error) throw error;
 
     // Update last_seen timestamp
-    const { error: updateError } = await supabase
+    const { error: updateError } = await this.client
       .from('profiles')
       .update({
         last_seen_at: new Date().toISOString()
@@ -148,7 +155,7 @@ export class AuthService {
   }
 
   async getCurrentUser(userId: string) {
-    const { data: profile, error } = await supabase
+    const { data: profile, error } = await this.client
       .from('profiles')
       .select('*')
       .eq('id', userId)

@@ -1,13 +1,17 @@
-import { supabase, supabaseAdmin } from '../config/supabase';
-import { Profile } from '../types/database';
-
-// Use admin client in test environment to bypass auth
-const client = process.env.NODE_ENV === 'test' ? supabaseAdmin : supabase;
+import { SupabaseClient } from '@supabase/supabase-js';
+import { getClientWithToken, supabaseAdmin } from '../config/supabase';
+import { Database, Profile } from '../types/database';
 
 export class ProfileService {
+  private client: SupabaseClient<Database>;
+
+  constructor(token: string) {
+    this.client = getClientWithToken(token);
+  }
+
   // Core Profile Operations
   async getProfileById(id: string): Promise<Profile> {
-    const { data, error } = await client
+    const { data, error } = await this.client
       .from('profiles')
       .select('*')
       .eq('id', id)
@@ -20,7 +24,7 @@ export class ProfileService {
   }
 
   async getProfileByUsername(username: string): Promise<Profile> {
-    const { data, error } = await client
+    const { data, error } = await this.client
       .from('profiles')
       .select('*')
       .eq('username', username)
@@ -39,7 +43,7 @@ export class ProfileService {
     delete data.email_verified;
     delete data.is_admin;
 
-    const { data: updatedProfile, error } = await client
+    const { data: updatedProfile, error } = await this.client
       .from('profiles')
       .update(data)
       .eq('id', id)
@@ -54,8 +58,7 @@ export class ProfileService {
 
   // Status Management
   async updateStatus(id: string, status: Profile['status'], customStatus?: string): Promise<void> {
-		console.log('Updating status for user:', id, '\nwith status:', status, '\nand custom status:', customStatus);
-    const { error } = await client
+    const { error } = await this.client
       .from('profiles')
       .update({
         status,
@@ -68,7 +71,7 @@ export class ProfileService {
   }
 
   async updateLastSeen(id: string): Promise<void> {
-    const { error } = await client
+    const { error } = await this.client
       .from('profiles')
       .update({
         last_seen_at: new Date().toISOString()
@@ -80,7 +83,7 @@ export class ProfileService {
 
   // Bulk Operations
   async getProfiles(ids: string[]): Promise<Profile[]> {
-    const { data, error } = await client
+    const { data, error } = await this.client
       .from('profiles')
       .select('*')
       .in('id', ids);
@@ -90,7 +93,7 @@ export class ProfileService {
   }
 
   async searchProfiles(query: string): Promise<Profile[]> {
-    const { data, error } = await client
+    const { data, error } = await this.client
       .from('profiles')
       .select('*')
       .or(`username.ilike.%${query}%,full_name.ilike.%${query}%`)
@@ -105,7 +108,7 @@ export class ProfileService {
     id: string,
     preferences: Profile['notification_preferences']
   ): Promise<void> {
-    const { error } = await client
+    const { error } = await this.client
       .from('profiles')
       .update({ notification_preferences: preferences })
       .eq('id', id);
@@ -114,7 +117,7 @@ export class ProfileService {
   }
 
   async updateThemePreference(id: string, theme: Profile['theme_preference']): Promise<void> {
-    const { error } = await client
+    const { error } = await this.client
       .from('profiles')
       .update({ theme_preference: theme })
       .eq('id', id);
@@ -141,5 +144,3 @@ export class ProfileService {
     if (error) throw error;
   }
 }
-
-export const profileService = new ProfileService(); 

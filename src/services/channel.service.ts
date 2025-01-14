@@ -1,13 +1,19 @@
-import { supabase, supabaseAdmin } from '../config/supabase';
-import { Channel, ChannelMember } from '../types/database';
-
-// Use admin client in test environment to bypass RLS
-const client = process.env.NODE_ENV === 'test' ? supabaseAdmin : supabase;
+import { SupabaseClient } from '@supabase/supabase-js';
+import { getClientWithToken } from '../config/supabase';
+import { Channel, ChannelMember, Database } from '../types/database';
 
 export class ChannelService {
+
+  private client: SupabaseClient<Database>;
+
+  constructor(token: string) {
+    this.client = getClientWithToken(token);
+  }
+
   // Core Channel Operations
   async createChannel(channelData: Partial<Channel>, member_ids?: string[]): Promise<Channel> {
-    const { data: { user } } = await client.auth.getUser();
+    console.log('createChannel', channelData, member_ids);
+    const { data: { user } } = await this.client.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
     // For direct messages, ensure exactly two members
@@ -20,7 +26,7 @@ export class ChannelService {
     }
 
     // Create the channel
-    const { data: channel, error } = await client
+    const { data: channel, error } = await this.client
       .from('channels')
       .insert({
         ...channelData,
@@ -62,7 +68,7 @@ export class ChannelService {
   }
 
   async getChannelById(id: string): Promise<Channel> {
-    const { data: channel, error } = await client
+    const { data: channel, error } = await this.client
       .from('channels')
       .select('*')
       .eq('id', id)
@@ -75,7 +81,7 @@ export class ChannelService {
   }
 
   async updateChannel(id: string, data: Partial<Channel>): Promise<Channel> {
-    const { data: channel, error } = await client
+    const { data: channel, error } = await this.client
       .from('channels')
       .update(data)
       .eq('id', id)
@@ -89,7 +95,7 @@ export class ChannelService {
   }
 
   async archiveChannel(id: string): Promise<void> {
-    const { error } = await client
+    const { error } = await this.client
       .from('channels')
       .update({ is_archived: true })
       .eq('id', id);
@@ -98,7 +104,7 @@ export class ChannelService {
   }
 
   async deleteChannel(id: string): Promise<void> {
-    const { error } = await client
+    const { error } = await this.client
       .from('channels')
       .delete()
       .eq('id', id);
@@ -113,10 +119,10 @@ export class ChannelService {
     limit?: number;
     offset?: number;
   } = {}): Promise<Channel[]> {
-    const { data: { user } } = await client.auth.getUser();
+    const { data: { user } } = await this.client.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    let query = client
+    let query = this.client
       .from('channels')
       .select(`
         *,
@@ -162,7 +168,7 @@ export class ChannelService {
   }
 
   async searchChannels(query: string): Promise<Channel[]> {
-    const { data, error } = await client
+    const { data, error } = await this.client
       .from('channels')
       .select('*')
       .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
@@ -175,7 +181,7 @@ export class ChannelService {
 
   // Channel Member Operations
   async addMember(channelId: string, profileId: string, role: ChannelMember['role'] = 'member'): Promise<ChannelMember> {
-    const { error: createError } = await client
+    const { error: createError } = await this.client
       .from('channel_members')
       .insert({
         channel_id: channelId,
@@ -185,7 +191,7 @@ export class ChannelService {
 
     if (createError) throw createError;
 
-    const { data: member, error: readError } = await client
+    const { data: member, error: readError } = await this.client
       .from('channel_members')
       .select()
       .eq('channel_id', channelId)
@@ -199,7 +205,7 @@ export class ChannelService {
   }
 
   async removeMember(channelId: string, profileId: string): Promise<void> {
-    const { error } = await client
+    const { error } = await this.client
       .from('channel_members')
       .delete()
       .eq('channel_id', channelId)
@@ -209,7 +215,7 @@ export class ChannelService {
   }
 
   async updateMemberRole(channelId: string, profileId: string, role: ChannelMember['role']): Promise<ChannelMember> {
-    const { data: member, error } = await client
+    const { data: member, error } = await this.client
       .from('channel_members')
       .update({ role })
       .eq('channel_id', channelId)
@@ -225,7 +231,7 @@ export class ChannelService {
 
   async getChannelMembers(channelId: string): Promise<ChannelMember[]> {
     // First check if the channel is public
-    const { data: channel, error: channelError } = await client
+    const { data: channel, error: channelError } = await this.client
       .from('channels')
       .select('type')
       .eq('id', channelId)
@@ -234,7 +240,7 @@ export class ChannelService {
     if (channelError) throw channelError;
     if (!channel) throw new Error('Channel not found');
 
-    const { data, error } = await client
+    const { data, error } = await this.client
       .from('channel_members')
       .select('*, profile:profiles(*)')
       .eq('channel_id', channelId);
@@ -246,9 +252,10 @@ export class ChannelService {
   async updateMemberSettings(
     channelId: string,
     profileId: string,
-    settings: Partial<ChannelMember['settings']>
+    settings: Partial<ChannelMember['settings']>,
+    token?: string
   ): Promise<ChannelMember> {
-    const { data: member, error } = await client
+    const { data: member, error } = await this.client
       .from('channel_members')
       .update({
         settings: settings
@@ -265,7 +272,7 @@ export class ChannelService {
   }
 
   async updateLastRead(channelId: string, profileId: string): Promise<void> {
-    const { error } = await client
+    const { error } = await this.client
       .from('channel_members')
       .update({
         last_read_at: new Date().toISOString()
@@ -277,7 +284,7 @@ export class ChannelService {
   }
 
   async toggleMute(channelId: string, profileId: string, isMuted: boolean): Promise<void> {
-    const { error } = await client
+    const { error } = await this.client
       .from('channel_members')
       .update({
         is_muted: isMuted
@@ -288,5 +295,3 @@ export class ChannelService {
     if (error) throw error;
   }
 }
-
-export const channelService = new ChannelService(); 

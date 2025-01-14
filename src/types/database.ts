@@ -1,3 +1,5 @@
+import { SupabaseClient } from "@supabase/supabase-js";
+
 export interface Profile {
   // Core Identity
   id: string;
@@ -120,3 +122,13 @@ export interface File {
   // Joined data
   uploader?: Profile;
 } 
+
+export type Database = SupabaseClient<{
+  profiles: Profile;
+  channels: Channel;
+  channel_members: ChannelMember;
+  messages: Message;
+  message_reactions: MessageReaction;
+  attachments: Attachment;
+  files: File;
+}>;
