@@ -16,7 +16,7 @@ export class AuthService {
     full_name: string
   ) {
     // First check if username is already taken
-    const { data: existingUser } = await this.client
+    const { data: existingUser } = await supabaseAdmin
       .from('profiles')
       .select('username')
       .eq('username', username)
@@ -27,7 +27,7 @@ export class AuthService {
     }
 
     // Create auth user with regular client and require email verification
-    const { data: authData, error: authError } = await this.client.auth.signUp({
+    const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
       email,
       password,
       options: {
