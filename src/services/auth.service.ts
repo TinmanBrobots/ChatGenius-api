@@ -6,6 +6,7 @@ export class AuthService {
   private client: SupabaseClient<Database>;
 
   constructor(token?: string) {
+    console.log('token', token);
     this.client = token ? getClientWithToken(token) : supabaseAdmin;
   }
 
@@ -43,7 +44,7 @@ export class AuthService {
     if (!authData.user) throw new Error('Failed to create user');
 
     // Create profile with admin client to bypass RLS
-    const { error: profileError } = await this.client
+    const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert({
         id: authData.user.id,
@@ -64,7 +65,7 @@ export class AuthService {
 
     if (profileError) {
       // If profile creation fails, delete the auth user
-      await this.client.auth.admin.deleteUser(authData.user.id);
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       throw profileError;
     }
 
