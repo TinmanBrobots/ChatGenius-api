@@ -64,13 +64,14 @@ async function initDatabase() {
       END $$;
       `,
 
-      // // 4. Create schemas
+      // 4. Create schemas
       // await readSqlFile('profiles/schema.sql'),
       // await readSqlFile('channels/schema.sql'),
       // await readSqlFile('channel_members/schema.sql'),
       // await readSqlFile('messages/schema.sql'),
       // await readSqlFile('message_reactions/schema.sql'),
       // await readSqlFile('files/schema.sql'),
+      await readSqlFile('rag_metrics/schema.sql'),
 
       // 5. Create policies
       await readSqlFile('profiles/policies.sql'),
@@ -80,6 +81,7 @@ async function initDatabase() {
       await readSqlFile('message_reactions/policies.sql'),
       await readSqlFile('files/policies.sql'),
       await readSqlFile('storage/policies.sql'),
+      await readSqlFile('rag_metrics/policies.sql'),
 
       // 6. Create functions
       // await readSqlFile('profiles/functions.sql'),
