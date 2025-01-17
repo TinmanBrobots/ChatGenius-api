@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { supabaseAdmin, getClientWithToken } from '../config/supabase';
 import { Database, Message, MessageReaction } from '../types/database';
+import { RAGService } from './rag.service';
 
 interface ChannelMemberBasic {
   channel_id: string;
@@ -14,29 +15,106 @@ interface MessageWithChannel extends Message {
 
 export class MessageService {
   private client: SupabaseClient<Database>;
+  private ragService: RAGService;
 
   constructor(token: string) {
     this.client = process.env.NODE_ENV === 'test' ? supabaseAdmin : getClientWithToken(token);
+    this.ragService = new RAGService(token);
+  }
+
+  // Initialize RAG service
+  private async ensureRAGInitialized(): Promise<void> {
+    try {
+      await this.ragService.initialize();
+    } catch (error) {
+      console.error('Failed to initialize RAG service:', error);
+      // Don't throw - we want message operations to work even if RAG fails
+    }
   }
 
   // Core Message Operations
-  async createMessage(data: Partial<Message>): Promise<Message> {
+  async createMessage(data: Partial<Message> & { mentioned_users?: string[] }, asAdmin: boolean = false): Promise<Message> {
     const { data: { user } } = await this.client.auth.getUser();
-    if (!user) throw new Error('Unauthorized');
+    if (!user && !asAdmin) throw new Error('Unauthorized');
 
-    const { data: message, error } = await this.client
+    // Create the message
+    const { data: message, error } = await (asAdmin ? supabaseAdmin : this.client)
       .from('messages')
       .insert({
         ...data,
-        sender_id: user.id
+        sender_id: data.sender_id || user?.id,
+        metadata: {
+          ...data.metadata,
+        }
       })
-      .select('*, sender:profiles(*)')
+      .select('*, sender:profiles(*), channel:channels!inner(type, name)')
       .single();
 
     if (error) throw error;
     if (!message) throw new Error('Failed to create message');
 
+    // Process message with RAG in the background
+    if (data.metadata?.mentioned_users?.length) {
+      this.processMessageWithRAG(message, data.metadata.mentioned_users).catch(error => {
+        console.error('Failed to process message with RAG:', error);
+      });
+    }
+
     return message;
+  }
+
+  // Process message with RAG and handle @mentions
+  private async processMessageWithRAG(
+    message: Message & { channel: { type: string, name: string } },
+    mentionedUserIds: string[]
+  ): Promise<void> {
+    try {
+      await this.ensureRAGInitialized();
+
+      // Add message to vector database
+      await this.ragService.processMessage(message);
+
+      // Get mentioned users' profiles
+      const { data: mentionedUsers, error: usersError } = await this.client
+        .from('profiles')
+        .select('*')
+        .in('id', mentionedUserIds);
+
+      if (usersError || !mentionedUsers) {
+        throw new Error('Failed to fetch mentioned users');
+      }
+
+      // Generate responses for each mentioned user
+      for (const mentionedUser of mentionedUsers) {
+        try {
+          const response = await this.ragService.handleMentionQuery(
+            message.content,
+            message.channel_id,
+            mentionedUser.id
+          );
+
+          // Create response message
+          await this.createMessage({
+            channel_id: message.channel_id,
+            content: response.response,
+            parent_id: message.id, // Link as a reply
+            sender_id: mentionedUser.id,
+            type: 'text',
+            metadata: {
+              isRAGResponse: true,
+              confidence: response.confidence,
+              mentionedUser: mentionedUser.username
+            }
+          }, true);
+
+        } catch (error) {
+          console.error(`Failed to generate response for @${mentionedUser.username}:`, error);
+        }
+      }
+
+    } catch (error) {
+      console.error('Failed to process message with RAG:', error);
+    }
   }
 
   async getMessage(id: string): Promise<Message> {

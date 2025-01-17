@@ -8,7 +8,7 @@ const createMessageSchema = z.object({
   content: z.string().min(1),
   type: z.enum(['text', 'image', 'file', 'system']).default('text'),
   parent_id: z.string().uuid().optional(),
-  metadata: z.record(z.any()).optional()
+  metadata: z.record(z.any()).optional(),
 });
 
 const updateMessageSchema = z.object({
