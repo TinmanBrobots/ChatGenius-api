@@ -33,12 +33,14 @@ export class MessageService {
   }
 
   // Core Message Operations
-  async createMessage(data: Partial<Message> & { mentioned_users?: string[] }, asAdmin: boolean = false): Promise<Message> {
+  async createMessage(data: Partial<Message> & { mentioned_users?: string[] }, asSystem: boolean = false): Promise<Message> {
     const { data: { user } } = await this.client.auth.getUser();
-    if (!user && !asAdmin) throw new Error('Unauthorized');
+    if (!user && !asSystem) throw new Error('Unauthorized');
+
+    console.log(asSystem);
 
     // Create the message
-    const { data: message, error } = await (asAdmin ? supabaseAdmin : this.client)
+    const { data: message, error } = await (asSystem ? supabaseAdmin : this.client)
       .from('messages')
       .insert({
         ...data,
@@ -53,14 +55,24 @@ export class MessageService {
     if (error) throw error;
     if (!message) throw new Error('Failed to create message');
 
+    if (!asSystem) {
+      this.uploadMessageToRAG(message);
+    }
+
     // Process message with RAG in the background
     if (data.metadata?.mentioned_users?.length) {
-      this.processMessageWithRAG(message, data.metadata.mentioned_users).catch(error => {
+      this.processMessageWithRAG(message, data.metadata.mentioned_users)
+      .catch(error => {
         console.error('Failed to process message with RAG:', error);
       });
     }
 
     return message;
+  }
+
+  private async uploadMessageToRAG(message: Message): Promise<void> {
+    await this.ensureRAGInitialized();
+    await this.ragService.processMessage(message);
   }
 
   // Process message with RAG and handle @mentions
@@ -87,11 +99,15 @@ export class MessageService {
       // Generate responses for each mentioned user
       for (const mentionedUser of mentionedUsers) {
         try {
+          console.log("Generating response for @", mentionedUser.username);
           const response = await this.ragService.handleMentionQuery(
             message.content,
             message.channel_id,
             mentionedUser.id
           );
+
+          console.log("Response generated for @", mentionedUser.username);
+          console.log("Creating response message");
 
           // Create response message
           await this.createMessage({
@@ -99,7 +115,7 @@ export class MessageService {
             content: response.response,
             parent_id: message.id, // Link as a reply
             sender_id: mentionedUser.id,
-            type: 'text',
+            type: 'system',
             metadata: {
               isRAGResponse: true,
               confidence: response.confidence,

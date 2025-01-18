@@ -51,12 +51,6 @@ CREATE POLICY "System can send system messages"
 ON messages FOR INSERT
 WITH CHECK (
     type = 'system'
-    AND
-    EXISTS (
-        SELECT 1 FROM profiles
-        WHERE profiles.id = auth.uid()
-        AND profiles.is_admin = true
-    )
 );
 
 -- UPDATE policies
